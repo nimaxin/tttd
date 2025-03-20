@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from sqlite3 import OperationalError
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, status
@@ -47,20 +48,23 @@ async def telethon_to_tdesktop(tdesktop_create: TDesktopCreate):
         api_id=tdesktop_create.api_id,
         api_hash=tdesktop_create.api_hash,
     )
-    tdesktop = await TDesktop.FromTelethon(
-        telegram_client,
-        flag=UseCurrentSession,
-        api=APIData(
-            api_id=tdesktop_create.api_id,
-            api_hash=tdesktop_create.api_hash,
-            device_model=tdesktop_create.device_model,
-            system_version=tdesktop_create.system_version,
-            app_version=tdesktop_create.app_version,
-            lang_code=tdesktop_create.lang_code,
-            system_lang_code=tdesktop_create.system_lang_code,
-            lang_pack=tdesktop_create.lang_pack,
-        ),
-    )
+    try:
+        tdesktop = await TDesktop.FromTelethon(
+            telegram_client,
+            flag=UseCurrentSession,
+            api=APIData(
+                api_id=tdesktop_create.api_id,
+                api_hash=tdesktop_create.api_hash,
+                device_model=tdesktop_create.device_model,
+                system_version=tdesktop_create.system_version,
+                app_version=tdesktop_create.app_version,
+                lang_code=tdesktop_create.lang_code,
+                system_lang_code=tdesktop_create.system_lang_code,
+                lang_pack=tdesktop_create.lang_pack,
+            ),
+        )
+    except OperationalError:
+        raise HTTPException(status_code=status.HTTP_423_LOCKED, detail="session in use")
     tdata_dir = tdatas_dir.joinpath(tdesktop_create.session)
     tdata_dir.mkdir(parents=True, exist_ok=True)
     tdesktop.SaveTData(tdata_dir.joinpath("tdata"))

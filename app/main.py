@@ -19,7 +19,14 @@ tdatas_dir = Path(os.getenv("TDATAS_DIR"))
 tdatas_dir.mkdir(parents=True, exist_ok=True)
 
 
+class Client(TelegramClient):
+    async def connect(self):
+        print("Connected")
+        return await super().connect()
+
+
 class TDesktopCreate(BaseModel):
+    user_id: int
     session: str
     api_id: int
     api_hash: str
@@ -43,11 +50,20 @@ async def telethon_to_tdesktop(tdesktop_create: TDesktopCreate):
             status_code=status.HTTP_404_NOT_FOUND, detail="session not found"
         )
 
-    telegram_client = TelegramClient(
+    tdata_dir = tdatas_dir.joinpath(tdesktop_create.session)
+    tdata_dir.mkdir(parents=True, exist_ok=True)
+    tdata_dir_tdata = tdata_dir.joinpath("tdata")
+    if tdata_dir_tdata.exists():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="tdata already exists"
+        )
+
+    telegram_client = Client(
         session_path,
         api_id=tdesktop_create.api_id,
         api_hash=tdesktop_create.api_hash,
     )
+    setattr(telegram_client, "UserId", tdesktop_create.user_id)
     try:
         tdesktop = await TDesktop.FromTelethon(
             telegram_client,
@@ -65,12 +81,7 @@ async def telethon_to_tdesktop(tdesktop_create: TDesktopCreate):
         )
     except OperationalError:
         raise HTTPException(status_code=status.HTTP_423_LOCKED, detail="session in use")
-    tdata_dir = tdatas_dir.joinpath(tdesktop_create.session)
-    tdata_dir.mkdir(parents=True, exist_ok=True)
-    tdata_dir_tdata = tdata_dir.joinpath("tdata")
-    if tdata_dir_tdata.exists():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="tdata already exists"
-        )
     tdesktop.SaveTData(tdata_dir_tdata)
+    if telegram_client.is_connected():
+        await telegram_client.disconnect()
     return {"tdata_dir": tdata_dir}

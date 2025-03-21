@@ -67,5 +67,10 @@ async def telethon_to_tdesktop(tdesktop_create: TDesktopCreate):
         raise HTTPException(status_code=status.HTTP_423_LOCKED, detail="session in use")
     tdata_dir = tdatas_dir.joinpath(tdesktop_create.session)
     tdata_dir.mkdir(parents=True, exist_ok=True)
-    tdesktop.SaveTData(tdata_dir.joinpath("tdata"))
+    tdata_dir_tdata = tdata_dir.joinpath("tdata")
+    if tdata_dir_tdata.exists():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="tdata already exists"
+        )
+    tdesktop.SaveTData(tdata_dir_tdata)
     return {"tdata_dir": tdata_dir}
